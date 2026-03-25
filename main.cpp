@@ -24,6 +24,7 @@
 #include "mod_prices.h"
 #include "mod_trade.h"
 #include "mod_charts.h"
+#include "mod_wallet.h"
 
 #include "raylib.h"
 #include "rlImGui.h"
@@ -233,6 +234,11 @@ int main(void)
             if(ImGui::BeginTabItem(" LOG "))
             {
                 DrawLogTab();
+                ImGui::EndTabItem();
+            }
+            if(ImGui::BeginTabItem(" WALLET "))
+            {
+                DrawWalletTab();
                 ImGui::EndTabItem();
             }
 

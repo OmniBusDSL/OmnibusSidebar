@@ -8,28 +8,35 @@ TARGET   = OmnibusSidebar.exe
 CXX      = g++
 WINDRES  = windres
 
-IMGUI_DIR = ./imgui
+IMGUI_DIR  = ./imgui
+RAYLIB_DIR = ./raylib_pkg/raylib-5.0_win64_mingw-w64
 
 CXXFLAGS = -std=c++17 -O2 \
            -I. \
            -I$(IMGUI_DIR) \
+           -I$(RAYLIB_DIR)/include \
            -DWIN32_LEAN_AND_MEAN
 
 # WinINet  = Windows built-in HTTP  (no libcurl needed)
 # -mwindows = no console window at startup
-LDFLAGS  = -lraylib \
+LDFLAGS  = -L$(RAYLIB_DIR)/lib \
+           -lraylib \
            -lopengl32 \
            -lgdi32    \
            -lwinmm    \
            -lwininet  \
+           -lwinhttp  \
            -mwindows
 
 SOURCES  = main.cpp \
            fetch.cpp \
+           win_input_region.cpp \
            mod_toast.cpp \
            mod_log.cpp \
            mod_prices.cpp \
            mod_trade.cpp \
+           mod_wallet.cpp \
+           mod_charts.cpp \
            rlImGui.cpp \
            $(IMGUI_DIR)/imgui.cpp \
            $(IMGUI_DIR)/imgui_draw.cpp \

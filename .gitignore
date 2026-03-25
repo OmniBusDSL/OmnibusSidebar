@@ -1,0 +1,20 @@
+# Executabile
+*.exe
+*.o
+
+# Arhive / temp
+*.zip
+*_tmp/
+imgui.ini
+
+# Librării locale (prea mari pentru git)
+raylib_pkg/
+imgui190_tmp/
+imgui192_tmp/
+imgui_tmp/
+rl_tmp/
+extras/
+
+# IDE
+.vscode/
+*.user

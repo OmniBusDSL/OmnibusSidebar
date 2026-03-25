@@ -1,8 +1,4 @@
 // Resource file for OmnibusSidebar.exe
-// Place your icon as: assets/app_icon.ico
-
-MAINICON ICON "assets/app_icon.ico"
-
 // Version info (shows in Properties > Details)
 1 VERSIONINFO
 FILEVERSION     1,0,0,0
