@@ -1,218 +1,180 @@
-# OmnibusSidebar v4.0
+# OmnibusSidebar
 
-Transparent crypto price ticker + trading terminal sidebar for Windows.
-Always-on-top, click-through in background, 1s live data from 3 exchanges.
-
----
-
-## Ce face
-
-- Sidebar floating pe dreapta ecranului (430px), transparent in rest
-- Preturi live: **LCX**, **Kraken**, **Coinbase** — BTC, ETH, LCX
-- Flash animatie la schimbare de pret (verde = up, rosu = down)
-- Tab TRADE: formular de ordine cu BUY/SELL + confirmare modal
-- Tab LOG: mesaje colorate, buffer circular 256 linii
-- Fereastra flotanta de **candlestick charts** cu volume bars
-- Toast notifications cu animatie slide-in + fade-out
-- Inchidere cu **Alt+F4**
+**Desktop trading sidebar + OmniBus wallet**
+**Stack:** C++17, Raylib 5.0, Dear ImGui 1.92, WinHTTP, DPAPI
+**GitHub:** https://github.com/OmniBusDSL/OmnibusSidebar
 
 ---
 
-## Structura fisiere
+## Ce este
 
-```
-OmnibusSidebar/
-├── main.cpp              # Entry point, init Raylib + ImGui, main loop, header, tabs, footer
-├── app_state.h           # Structs globale: Tick, MarketData, fonts, g_md, g_run, g_monW/H
-│
-├── fetch.cpp / .h        # Thread background HTTP polling @ 1s
-│                         #   HttpGet()     — WinINet HTTPS GET
-│                         #   Jx()          — JSON key extractor minimal (fara librarie)
-│                         #   ParseLCX()    — JSON LCX ticker
-│                         #   ParseKraken() — JSON Kraken ticker
-│                         #   ParseCoinbase()— JSON Coinbase ticker
-│                         #   FetchLoop()   — thread principal fetch + flash trigger
-│
-├── mod_prices.cpp / .h   # Tab PRICES
-│                         #   FlashColor()      — interpolare culoare pe timer
-│                         #   PriceCell()       — celula pret cu decimale adaptive
-│                         #   ExchangeSection() — tabel BID/ASK/LAST/SPREAD% per exchange
-│                         #   DrawPricesTab()   — 3 sectiuni (LCX blue, Kraken purple, CB green)
-│
-├── mod_trade.cpp / .h    # Tab TRADE
-│                         #   Selector exchange + asset
-│                         #   Input amount + limit price + buton Fill
-│                         #   BUY / SELL cu modal de confirmare
-│                         #   DoOrder() — logheaza + toast (fara executie API inca)
-│
-├── mod_log.cpp / .h      # Tab LOG
-│                         #   Buffer circular g_log[256] cu mutex
-│                         #   Log() — adauga linie colorata, auto-scroll
-│                         #   DrawLogTab() — render scrollabil
-│
-├── mod_toast.cpp / .h    # Notificari toast
-│                         #   PushToast() — adauga notificare (max 5 simultane)
-│                         #   DrawToasts() — slide-in, progress bar, fade-out, 3.5s durata
-│
-├── mod_charts.cpp / .h   # Fereastra flotanta candlestick
-│                         #   ParseKrakenOHLC() / ParseCoinbaseCandles() / ParseLCXKline()
-│                         #   FetchCandles()    — thread fetch ~200 lumanari
-│                         #   DrawCandlesticks()— corp + fitil + volume + grid + last price line
-│                         #   DrawChartsWindow()— fereastra ImGui flotanta stanga
-│                         #   DrawChartsButton()— buton din header sidebar
-│
-├── win_input_region.cpp / .h  # Windows-only input region
-│                              #   UpdateInputRegion() — SetWindowRgn() via WinAPI
-│                              #   Sidebar closed: input doar pe dreapta 430px
-│                              #   Chart open: input pe tot ecranul
-│
-├── assets/
-│   ├── Inter-Regular.ttf  # Font UI 14px
-│   ├── Inter-Medium.ttf   # Font UI default 14px
-│   └── Inter-Bold.ttf     # Font titluri 15px, 22px
-│
-├── imgui/                 # Dear ImGui source (ocornut/imgui)
-│   ├── imgui.cpp / .h
-│   ├── imgui_draw.cpp
-│   ├── imgui_widgets.cpp
-│   └── imgui_tables.cpp
-│
-├── rlImGui.cpp / .h       # Bridge Raylib ↔ ImGui (raylib-extras/rlImGui)
-├── imgui_impl_raylib.h    # Header compatibilitate
-│
-├── raylib_pkg/            # Raylib 5.0 win64 mingw-w64 (headers + lib)
-│   └── raylib-5.0_win64_mingw-w64/
-│       ├── include/       # raylib.h
-│       └── lib/           # libraylib.a
-│
-├── resource.rc            # Icon aplicatie + versiune (Windows VERSIONINFO)
-├── Makefile               # Build cu mingw32-make
-└── OmnibusSidebar.exe     # Executabil final
-```
+Aplicație desktop Windows (sidebar lateral) cu:
+- **Prețuri live** — LCX, Kraken, Coinbase (polling 1s, WinINet)
+- **Wallet OmniBus** — balance + send direct la nod Zig via WinHTTP (fără Python)
+- **Trading UI** — ordine BUY/SELL cu modal confirmare (semnătură HMAC TODO)
+- **Grafice** — candlestick OHLCV, 5 timeframe-uri, zoom/scroll
+- **SuperVault** — stocare criptată chei API via Windows DPAPI
+- **Log** — ring buffer 256 entries, thread-safe
 
----
-
-## Librarii folosite
-
-| Librarie | Versiune | Scop |
-|----------|----------|------|
-| **Raylib** | 5.0 | Fereastra, rendering, 60 FPS, input |
-| **Dear ImGui** | latest | UI: widgets, tabs, tabele, modals, tooltips |
-| **rlImGui** | latest | Bridge Raylib ↔ ImGui |
-| **WinINet** | built-in Windows | HTTP/HTTPS GET (fara curl) |
-| **WinAPI** | built-in Windows | Window region, input management |
-| **Inter** | font TTF | Typography: Regular, Medium, Bold |
-
----
-
-## API Endpoints folosite
-
-### Ticker live (polling 1s)
-
-| Exchange | URL | Date returnate |
-|----------|-----|----------------|
-| LCX | `exchange-api.lcx.com/api/ticker?pair=BTC%2FUSDC` | lastPrice, bestBid, bestAsk |
-| LCX | `exchange-api.lcx.com/api/ticker?pair=ETH%2FUSDC` | same |
-| LCX | `exchange-api.lcx.com/api/ticker?pair=LCX%2FUSDC` | same |
-| Kraken | `api.kraken.com/0/public/Ticker?pair=XBTUSD` | c (last), a (ask), b (bid) |
-| Kraken | `api.kraken.com/0/public/Ticker?pair=ETHUSD` | same |
-| Kraken | `api.kraken.com/0/public/Ticker?pair=LCXUSD` | same |
-| Coinbase | `api.coinbase.com/api/v3/brokerage/market/products/BTC-USD/ticker` | best_bid, best_ask, price |
-| Coinbase | `api.coinbase.com/api/v3/brokerage/market/products/ETH-USD/ticker` | same |
-| Coinbase | `api.coinbase.com/api/v3/brokerage/market/products/LCX-USD/ticker` | same |
-
-### Candles (la cerere, din Charts)
-
-| Exchange | URL | Format |
-|----------|-----|--------|
-| Kraken | `api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=60` | `[time, o, h, l, c, vwap, vol]` |
-| Coinbase | `api.coinbase.com/.../candles?granularity=3600` | `{start, open, high, low, close, volume}` |
-| LCX | `api-kline.lcx.com/v1/market/kline?pair=BTC%2FUSDC&resolution=1h` | `{data:[{time, open, high, low, close, volume}]}` |
-
-Toate endpoint-urile sunt **publice** (fara autentificare).
+Fereastra este `UNDECORATED + TOPMOST + TRANSPARENT` — se lipește pe partea dreaptă a ecranului.
 
 ---
 
 ## Build
 
-### Cerinte
-
-- **MinGW-w64** cu g++ (testat cu Strawberry Perl / MSYS2)
-- Raylib 5.0 inclus in `raylib_pkg/`
-
-### Compilare
-
 ```bash
-# Din MSYS2 / MinGW terminal:
-cd "/c/Kits work/limaje de programare/OmnibusSidebar"
+# Prerequisite: MinGW-w64 (Strawberry Perl include MinGW sau MSYS2)
+# Raylib 5.0 în ./raylib_pkg/raylib-5.0_win64_mingw-w64/
 
-# Cu Makefile (necesita icon in assets/app_icon.ico):
+cd "C:\Kits work\limaje de programare\OmnibusSidebar"
 mingw32-make
 
-# Sau direct cu g++ (fara icon):
-RAYLIB="raylib_pkg/raylib-5.0_win64_mingw-w64"
-g++ -std=c++17 -O2 -I. -Iimgui -I"$RAYLIB/include" -DWIN32_LEAN_AND_MEAN \
-  main.cpp fetch.cpp mod_toast.cpp mod_log.cpp mod_prices.cpp mod_trade.cpp \
-  mod_charts.cpp rlImGui.cpp win_input_region.cpp \
-  imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_widgets.cpp imgui/imgui_tables.cpp \
-  -L"$RAYLIB/lib" -lraylib -lopengl32 -lgdi32 -lwinmm -lwininet -mwindows \
-  -o OmnibusSidebar.exe
-```
-
-### Output
-
-`OmnibusSidebar.exe` — executabil standalone, fara dependente externe, fara fereastra console.
-
----
-
-## Utilizare
-
-1. Porneste `OmnibusSidebar.exe`
-2. Sidebar-ul apare pe dreapta ecranului, mereu deasupra
-3. Click in afara sidebar-ului trece direct la aplicatia de dedesubt (click-through)
-4. Butonul `CHARTS` din header deschide fereastra flotanta de candlestick
-5. **Alt+F4** pentru inchidere
-
----
-
-## Arhitectura tehnica
-
-```
-main.cpp
-  └── init Raylib (transparent, undecorated, topmost, fullscreen)
-  └── init ImGui (rlImGui bridge, 5 fonturi Inter)
-  └── thread: FetchLoop() — HTTP polling 1s
-  └── main loop @ 60 FPS:
-        ├── snapshot MarketData (mutex)
-        ├── UpdateInputRegion() daca s-a schimbat starea chart
-        ├── BeginDrawing() — background transparent
-        ├── DrawRectangle() — sidebar background + accent stripes
-        ├── rlImGuiBegin()
-        │     ├── Header (titlu + buton charts)
-        │     ├── TabBar:
-        │     │     ├── DrawPricesTab(md, dt)
-        │     │     ├── DrawTradeTab(md)
-        │     │     └── DrawLogTab()
-        │     └── DrawChartsWindow()   ← fereastra flotanta
-        ├── rlImGuiEnd()
-        ├── DrawToasts(dt)             ← overlay peste tot
-        └── EndDrawing()
+# Output: OmnibusSidebar.exe (~2.3 MB, zero runtime deps)
 ```
 
 ---
 
-## Adaugare modul nou
+## Structura proiectului
 
-1. Creeaza `mod_xyz.h` + `mod_xyz.cpp`
-2. Include in `main.cpp`: `#include "mod_xyz.h"`
-3. Adauga in Makefile la `SOURCES`
-4. Apeleaza `DrawXyzTab()` in sectiunea TabBar din `main.cpp`
+```
+OmnibusSidebar/
+├── main.cpp                  Entry: Raylib window, ImGui setup, 5 tabs, font loading
+├── app_state.h               Tick/MarketData structs, mutex globale, font handles
+├── fetch.cpp                 WinINet HTTP, parse JSON 3 exchange-uri, FetchLoop 1s
+├── win_input_region.cpp      SetWindowRgn — click-through transparent zone
+│
+├── mod_prices.cpp            Tab PRICES: prețuri live cu flash animation
+├── mod_trade.cpp             Tab TRADE: UI ordine BUY/SELL + modal confirmare
+├── mod_charts.cpp            Candlestick OHLCV, 5 timeframe-uri, zoom/scroll
+├── mod_wallet.cpp            Tab WALLET: WinHTTP → RPC 8332 (getbalance + sendtx)
+├── mod_log.cpp               Tab LOG: ring buffer 256 entries
+├── mod_toast.cpp             Toast notifications cu slide-in + timer
+│
+├── SuperVault/
+│   ├── VaultCore/
+│   │   ├── vault_core.h           C interface v4: 11 opcodes, VaultKeyEntry
+│   │   └── vault_core_windows.cpp DPAPI CryptProtectData/Unprotect, vault.dat v4
+│   ├── VaultService/
+│   │   └── vault_service.cpp      Named Pipe daemon: \\.\pipe\OmnibusVault
+│   ├── VaultClient/
+│   │   ├── vault_client.h
+│   │   └── vault_client.cpp       Client dual-mode (pipe + embedded)
+│   ├── VaultManager/
+│   │   ├── vault_manager.py       Tkinter GUI v3: 4 tab-uri complete (2130 linii)
+│   │   └── vault_manager_gui.cpp  GUI Raylib+ImGui standalone
+│   ├── OmnibusWallet/
+│   │   ├── wallet_core.py         BIP-39/44 derivare via bip_utils
+│   │   ├── wallet_store.py        DPAPI wallets.dat, atomic write
+│   │   ├── pq_domain.py           4 domenii PQ non-transferabile, HKDF-SHA512
+│   │   ├── pq_sign.py             PQ signing: liboqs (WSL/ctypes) + HMAC fallback
+│   │   ├── balance_fetcher.py     19 blockchain-uri + OMNI RPC 8332
+│   │   ├── send_transaction.py    SHA256d tx hash, secp256k1 sign, send OMNI
+│   │   └── chains/                BIP44/84 derivare: btc/eth/sol/bnb/... + omni*.py
+│   ├── mod_vault.cpp              Tab VAULT: DPAPI, vault.dat, SecureZeroMemory
+│   └── mod_vault.h
+│
+├── imgui/                    Dear ImGui 1.92 surse
+├── assets/                   Fonturi Inter (Bold, Medium, Regular)
+├── imgui_impl_raylib.h       Backend Raylib pentru ImGui
+├── rlImGui.cpp               rlImGui integration
+├── Makefile                  Build: g++ -std=c++17, -lwinhttp, -lwininet, -lraylib
+├── resource.rc               Version info
+└── wiki-omnibus/             Documentație completă
+    ├── INDEX.md              Inventar complet module + TODO
+    └── OMNIBUS_ACADEMIC_REPORT.md  Audit cod, scoruri, roadmap
+```
 
 ---
 
-## Limitari cunoscute
+## Tab WALLET — Conexiune la nod Zig
 
-- Trade execution: interfata UI completa, API calls de executie nu sunt inca implementate
-- Windows only (WinAPI pentru input region + WinINet pentru HTTP)
-- Fara WebSocket (REST polling la 1s)
-- Fara autentificare / balance display / order management
+`mod_wallet.cpp` se conectează direct la `omnibus-node.exe` via WinHTTP (fără Python subprocess):
+
+```
+OmnibusSidebar.exe
+    → WinHTTP POST http://127.0.0.1:8332
+        → getbalance   → address + balance OMNI + block height
+        → sendtransaction(to, amount_sat) → txid
+```
+
+Nodul trebuie să ruleze înainte de a deschide tab-ul Wallet:
+```bash
+.\zig-out\bin\omnibus-node.exe --mode seed --node-id main
+```
+
+---
+
+## SuperVault — Stocare criptată
+
+Cheile API și seed-urile wallet sunt stocate în `%APPDATA%\OmnibusSidebar\vault.dat` (DPAPI encrypted).
+
+```bash
+# Build vault_service
+g++ SuperVault/VaultService/vault_service.cpp SuperVault/VaultCore/vault_core_windows.cpp \
+    -lcrypt32 -lshell32 -ladvapi32 -o vault_service.exe
+
+# Pornire daemon
+vault_service.exe
+
+# GUI manager (Python)
+cd SuperVault/VaultManager
+python vault_manager.py
+```
+
+Named Pipe protocol: `\\.\pipe\OmnibusVault`
+Request: `[opcode:1][exchange:1][slot:2][payload_len:2][payload]`
+Response: `[error:1][payload_len:2][payload]`
+
+---
+
+## OmnibusWallet — 19 Blockchain-uri + 5 Domenii PQ
+
+```python
+from SuperVault.OmnibusWallet.wallet_core import create_wallet_entry
+from SuperVault.OmnibusWallet.balance_fetcher import fetch_omni
+
+# Creare wallet
+entry = create_wallet_entry("MyWallet", mnemonic, ["BTC", "ETH", "OMNI"])
+
+# Balance OMNI de la nod local
+bal = fetch_omni(address, rpc_url="http://127.0.0.1:8332")
+```
+
+Blockchain-uri suportate: BTC, ETH, SOL, BNB, LTC, DOGE, BCH, XLM, XRP, OP, ADA, ATOM, DOT, EGLD, OMNI (+ 5 domenii PQ)
+
+**5 Domenii Post-Quantum OMNI:**
+
+| Prefix | CoinType | Algoritm |
+|--------|----------|----------|
+| `ob_omni_` | 777 | ML-KEM-768 (Kyber) |
+| `ob_k1_` | 778 | ML-DSA (Dilithium-5) |
+| `ob_f5_` | 779 | Falcon-512 |
+| `ob_d5_` | 780 | SLH-DSA (SPHINCS+) |
+| `ob_s3_` | 781 | Falcon-Light AES |
+
+---
+
+## Status implementare
+
+| Componentă | Status | Scor |
+|------------|--------|------|
+| Prețuri live (3 exchange-uri) | Funcțional | 100% |
+| Grafice candlestick | Funcțional | 100% |
+| Tab WALLET (WinHTTP → RPC) | Funcțional | 90% |
+| Tab LOG + Toasts | Funcțional | 100% |
+| SuperVault DPAPI (Windows) | Funcțional | 90% |
+| OmnibusWallet (19 chain-uri) | Funcțional | 90% |
+| Domenii PQ (liboqs) | Parțial | 75% |
+| Trading execution (HMAC sign) | TODO | 15% |
+| SuperVault Linux (libsodium) | Planificat | 0% |
+
+**Audit complet:** `wiki-omnibus/OMNIBUS_ACADEMIC_REPORT.md`
+
+---
+
+## Legătură cu OmniBus-BlockChainCore
+
+- Nod Zig: https://github.com/SAVACAZAN/OmniBus-BlockChainCore
+- `mod_wallet.cpp` → `getbalance` / `sendtransaction` pe port 8332
+- Aceleași prefixe adrese (ob_omni_, ob_k1_, ob_f5_, ob_d5_, ob_s3_)
+- Aceleași coin types 777-781 în Zig + Python + C++
